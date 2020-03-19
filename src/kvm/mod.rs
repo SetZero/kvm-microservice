@@ -1,6 +1,7 @@
 mod json;
 use virt::connect::Connect;
 use virt::error::Error;
+use virt::domain::Domain;
 
 
 pub struct KVM {
@@ -48,13 +49,26 @@ impl KVM {
 
     pub fn get_domains(&self) -> Result<Vec<json::VirtualMachines>, Error> {
         let mut vec = Vec::new();
-        let flags = virt::connect::VIR_CONNECT_LIST_DOMAINS_ACTIVE;
+        let flags = virt::connect::VIR_CONNECT_LIST_DOMAINS_ACTIVE | virt::connect::VIR_CONNECT_LIST_DOMAINS_INACTIVE;
         if let Ok(doms) = self.conn.list_all_domains(flags) {
             for dom in doms {
-                vec.push(json::VirtualMachines{name: dom.get_name().unwrap_or(String::from("no-name")) });
+                vec.push(self.create_vm_info(&dom));
             }
             return Ok(vec);
         }
         Err(Error::new())
+    }
+
+    pub fn get_vm(&self) {
+        //TODO: implement me
+    }
+
+    fn create_vm_info(&self, dom: &Domain) -> json::VirtualMachines {
+        json::VirtualMachines{
+            name: dom.get_name().unwrap_or(String::from("no-name")),
+            state: dom.get_state().unwrap_or_default(),
+            memory: dom.get_max_memory().unwrap_or_default(),
+            vcpu: dom.get_max_vcpus().unwrap_or_default(),
+        }
     }
 }

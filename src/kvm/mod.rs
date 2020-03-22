@@ -1,4 +1,4 @@
-mod json;
+pub mod json;
 use virt::connect::Connect;
 use virt::error::Error;
 use virt::domain::Domain;
@@ -59,8 +59,26 @@ impl KVM {
         Err(Error::new())
     }
 
-    pub fn get_vm(&self) {
-        //TODO: implement me
+    pub fn start_vm(&self, name: String) -> Result<json::KVMInfo, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            if dom.create().is_ok() {
+                return Ok(json::KVMInfo{success: true, message: None})
+            }
+            return Err(Error::new().message)
+        }
+
+        Err(Error::new().message)
+    }
+
+    pub fn stop_vm(&self, name: String) -> Result<json::KVMInfo, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            if dom.shutdown().is_ok() {
+                return Ok(json::KVMInfo{success: true, message: None})
+            }
+            return Err(Error::new().message)
+        }
+
+        Err(Error::new().message)
     }
 
     fn create_vm_info(&self, dom: &Domain) -> json::VirtualMachines {
@@ -68,7 +86,16 @@ impl KVM {
             name: dom.get_name().unwrap_or(String::from("no-name")),
             state: dom.get_state().unwrap_or_default(),
             memory: dom.get_max_memory().unwrap_or_default(),
-            vcpu: dom.get_max_vcpus().unwrap_or_default(),
+            vcpu: (if self.is_running(dom) { dom.get_max_vcpus().unwrap_or_default() } else { 0 }),
+            autostart: dom.get_autostart().unwrap_or_default(),
+            os_type: dom.get_os_type().unwrap_or_default(),
+        }
+    }
+
+    fn is_running(&self, dom: &Domain) -> bool {
+        match dom.get_state() {
+            Err(_) => false,
+            Ok(v) => v.0 &  virt::domain::VIR_DOMAIN_SHUTOFF == 1
         }
     }
 }

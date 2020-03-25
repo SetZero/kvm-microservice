@@ -81,6 +81,57 @@ impl KVM {
         Err(Error::new().message)
     }
 
+    pub fn suspend(&self, name: String) -> Result<json::KVMInfo, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            if dom.suspend().is_ok() {
+                return Ok(json::KVMInfo{success: true, message: None})
+            }
+            return Err(Error::new().message)
+        }
+
+        Err(Error::new().message)
+    }
+
+    pub fn resume(&self, name: String) -> Result<json::KVMInfo, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            if dom.resume().is_ok() {
+                return Ok(json::KVMInfo{success: true, message: None})
+            }
+            return Err(Error::new().message)
+        }
+
+        Err(Error::new().message)
+    }
+
+    pub fn list_snapshots(&self, name: String) -> Result<Vec<String>, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            return dom.list_all_snapshots(0)
+                .and_then(|e| Ok(e.into_iter().map(|e|  e.get_name().unwrap_or_default()).collect()))
+                .map_err(|e| e.to_string())
+        }
+
+        Err(Error::new().message)
+    }
+
+    pub fn get_devices(&self, name: String) -> Result<Vec<String>, String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            return dom.get_connect()
+                    .and_then(|e| e.list_all_node_devices(virt::connect::VIR_CONNECT_LIST_NODE_DEVICES_CAP_STORAGE | virt::connect::VIR_CONNECT_LIST_NODE_DEVICES_CAP_VPORTS))
+                    .and_then(|e| Ok(e.into_iter().map(|e| e.get_name().unwrap_or_default()).collect()))
+                    .map_err(|e| e.to_string())
+        }
+        Err(Error::new().message)
+    }
+
+    pub fn get_console_out(&self, name: String) -> Result<(), String> {
+        if let Ok(dom) = Domain::lookup_by_name(&self.conn, name.as_str()) {
+            let vir_box = Box::<virt::stream::sys::virStream>::new(virt::stream::sys::virStream{});
+            let stream = virt::stream::Stream::new(Box::leak(vir_box) );
+            dom.open_console("serial0", stream, 0);
+        }
+        Err(Error::new().message)
+    }
+
     fn create_vm_info(&self, dom: &Domain) -> json::VirtualMachines {
         json::VirtualMachines{
             name: dom.get_name().unwrap_or(String::from("no-name")),
